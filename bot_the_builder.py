@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from datetime import datetime
 from subprocess import call, check_output
 
 import fire
@@ -11,13 +12,23 @@ class Builder(object):
 
     @staticmethod
     def _diff_files_from_master():
-        git_branch = check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).decode('utf-8').strip()
+        git_tag = check_output(['git', 'describe', '--tags', '--abbrev=0', '--match', 'deploy-*']).decode('utf-8').strip()
+        commit_hash = check_output(['git', 'rev-list', '-n', '1', git_tag]).decode('utf-8').strip()
 
         return [
             x for x in
-            check_output(['git', 'diff', '--name-only', f'master...{git_branch}']).decode('utf-8').strip().split('\n')
+            check_output(['git', 'diff', '--name-only', commit_hash, 'HEAD']).decode('utf-8').strip().split('\n')
             if x
         ]
+    
+    @staticmethod
+    def _tag_current():
+        date = datetime.now().strftime("%d-%m-%y-%H-%M-%S")
+        tag = f'deploy-{date}'
+        print(f'Tagging [{tag}]...')
+
+        Builder._cmd_exec(['git', 'tag', tag])
+        Builder._cmd_exec(['git', 'push', 'origin', tag])
 
     @staticmethod
     def _cmd_exec(cmd, silent=True):
@@ -99,6 +110,7 @@ class Builder(object):
 
                     if not dry:
                         Builder._do_deploy(dirpath, do_cloudbuild)
+                    Builder._tag_current()
                 else:
                     print('App has no pending changes')
 
