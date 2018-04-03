@@ -23,7 +23,7 @@ class Builder(object):
     
     @staticmethod
     def _tag_current():
-        date = datetime.now().strftime("%d-%m-%y-%H-%M-%S")
+        date = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
         tag = f'deploy-{date}'
         print(f'Tagging [{tag}]...')
 
