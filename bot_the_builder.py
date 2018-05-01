@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from contextlib import contextmanager
 from datetime import datetime
 from subprocess import call, check_output
 
@@ -6,6 +7,13 @@ import fire
 import os
 
 TEMPLATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template.sh')
+
+@contextmanager
+def dirswitch(dirpath):
+    old_path = os.getcwd()
+    os.chdir(dirpath)
+    yield dirpath
+    os.chdir(old_path)
 
 
 class Builder(object):
@@ -66,25 +74,47 @@ class Builder(object):
 
     @staticmethod
     def _do_deploy(app_root, do_cloudbuild):
-        current_dir = os.getcwd()
+        with dirswitch(app_root):
+            print('Substituting templates...')
+            Builder._template_env_interpolation()
 
-        os.chdir(app_root)
+            print('Building...')
 
-        print('Substituting templates...')
-        Builder._template_env_interpolation()
+            Builder._cmd_exec(['make', 'dist'])
 
-        print('Building...')
+            print('Build complete')
 
-        Builder._cmd_exec(['make', 'dist'])
+            if do_cloudbuild:
+                print('Found cloudbuild config, triggering cloudbuild... ')
+                Builder._do_cloudbuild()
+                print('cloudbuild complete')
 
-        print('Build complete')
+    def fetch_dependencies(self, app_path):
+        with dirswitch(app_path):
+            deps = check_output([
+                "go",
+                "list",
+                "-f",
+                "'{{ .Imports }}'"
+            ]).decode('utf-8').strip()
 
-        if do_cloudbuild:
-            print('Found cloudbuild config, triggering cloudbuild... ')
-            Builder._do_cloudbuild()
-            print('cloudbuild complete')
+        deps = [dep for dep in deps[2:-2].split(' ') if '/' in dep]
 
-        os.chdir(current_dir)
+        return deps
+    
+    def has_changed(self, dirpath, changed_files):
+        app_dependencies = self.fetch_dependencies(dirpath)
+
+        for somepath in changed_files:
+            absFpath = os.path.abspath(somepath)
+
+            if dirpath in absFpath:
+                return True
+            
+            for dep in app_dependencies:
+                if dep in absFpath:
+                    print(f'Detected change in dependency [{dep}]')
+                    return True
 
     def all(self, path=".", dry=False):
         # TODO: Check that path is in a git repo
@@ -101,7 +131,7 @@ class Builder(object):
             if 'Dockerfile' in filenames and 'Makefile' in filenames:
                 print(f'Found a deployable app at [{dirpath}]')
 
-                if any([dirpath in os.path.abspath(somepath) for somepath in changed_files]):
+                if self.has_changed(dirpath, changed_files):
                     print(f'App in [{dirpath}] was modified since last master deploy')
 
                     do_cloudbuild = 'cloudbuild.yml' in filenames or 'cloudbuild.yml.template' in filenames
@@ -110,7 +140,7 @@ class Builder(object):
 
                     if not dry:
                         Builder._do_deploy(dirpath, do_cloudbuild)
-                    Builder._tag_current()
+                        Builder._tag_current()
                 else:
                     print('App has no pending changes')
 
