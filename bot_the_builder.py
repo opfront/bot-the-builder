@@ -95,7 +95,7 @@ class Builder(object):
                 "go",
                 "list",
                 "-f",
-                "'{{ .Imports }}'"
+                "'{{ .Deps }}'"
             ]).decode('utf-8').strip()
 
         deps = [dep for dep in deps[2:-2].split(' ') if '/' in dep]
