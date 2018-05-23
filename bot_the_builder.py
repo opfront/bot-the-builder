@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from contextlib import contextmanager
 from datetime import datetime
-from subprocess import call, check_output
+from subprocess import call, check_output, CalledProcessError
 
 import fire
 import os
@@ -91,12 +91,15 @@ class Builder(object):
 
     def fetch_dependencies(self, app_path):
         with dirswitch(app_path):
-            deps = check_output([
-                "go",
-                "list",
-                "-f",
-                "'{{ .Deps }}'"
-            ]).decode('utf-8').strip()
+            try:
+                deps = check_output([
+                    "go",
+                    "list",
+                    "-f",
+                    "'{{ .Deps }}'"
+                ]).decode('utf-8').strip()
+            except CalledProcessError:
+                return []
 
         deps = [dep for dep in deps[2:-2].split(' ') if '/' in dep]
 
