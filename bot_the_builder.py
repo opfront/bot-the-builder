@@ -119,7 +119,7 @@ class Builder(object):
                     print(f'Detected change in dependency [{dep}]')
                     return True
 
-    def all(self, path=".", dry=False):
+    def all(self, path=".", dry=False, force=False):
         # TODO: Check that path is in a git repo
 
         if dry:
@@ -134,7 +134,7 @@ class Builder(object):
             if 'Dockerfile' in filenames and 'Makefile' in filenames:
                 print(f'Found a deployable app at [{dirpath}]')
 
-                if self.has_changed(dirpath, changed_files):
+                if self.has_changed(dirpath, changed_files) or force:
                     print(f'App in [{dirpath}] was modified since last master deploy')
 
                     do_cloudbuild = 'cloudbuild.yml' in filenames or 'cloudbuild.yml.template' in filenames
