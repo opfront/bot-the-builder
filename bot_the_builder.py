@@ -80,7 +80,7 @@ class Builder(object):
 
             print('Building...')
 
-            Builder._cmd_exec(['make', 'dist'])
+            Builder._cmd_exec(['make', 'dist'], silent=False)
 
             print('Build complete')
 
